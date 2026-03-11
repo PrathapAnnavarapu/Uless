@@ -88,8 +88,9 @@ export default function BrandDetailPage({ params }: { params: { slug: string } }
       return
     }
 
-    if (!profile.isVerified) {
+    if (!profile?.isVerified) {
       toast.error("This discount requires a verified student email (.edu)")
+      router.push("/student-verification")
       return
     }
 
@@ -347,7 +348,7 @@ export default function BrandDetailPage({ params }: { params: { slug: string } }
                         type="button"
                         variant="outline"
                         className="w-full text-[#5B48D9] border-[#5B48D9]"
-                        onClick={() => router.push("/verify")}
+                        onClick={() => router.push("/student-verification")}
                       >
                         Verify Now
                       </Button>

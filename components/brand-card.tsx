@@ -13,6 +13,7 @@ import { ensureBrandImages } from "@/utils/ensure-brand-images"
 
 interface BrandCardProps {
   brand: Brand
+  onClick?: () => void
 }
 
 // In the BrandCard component, update the brand before using it
@@ -24,6 +25,10 @@ export function BrandCard({ brand: originalBrand }: BrandCardProps) {
   const brand = ensureBrandImages(originalBrand)
 
   const handleClick = () => {
+    if (onClick) {
+      onClick()
+      return
+    }
     router.push(`/brands/${brand.slug}`)
     window.scrollTo(0, 0)
   }

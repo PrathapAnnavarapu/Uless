@@ -7,6 +7,9 @@ import jwt
 import json
 import os
 import uuid
+import random
+import smtplib
+from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -155,6 +158,90 @@ def login():
         },
     })
 
+
+@auth_bp.route("/verify-email/send", methods=["POST"])
+@auth_required
+def send_verification_email():
+    user = Profile.query.get(request.user_id)
+    if not user:
+        return jsonify({"error": "Not found"}), 404
+
+    otp = str(random.randint(100000, 999999))
+    user.otp_code = otp
+    user.otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+    db.session.commit()
+
+    sender = current_app.config.get("MAIL_USERNAME", "dummy.uless.app@gmail.com")
+    password = current_app.config.get("MAIL_PASSWORD", "dummy_app_password")
+    host = current_app.config.get("MAIL_SERVER", "smtp.gmail.com")
+    port = current_app.config.get("MAIL_PORT", 587)
+    use_tls = current_app.config.get("MAIL_USE_TLS", True)
+
+    msg = MIMEText(f"Your Uless student verification code is: {otp}\nIt expires in 10 minutes.")
+    msg['Subject'] = 'Uless Student Verification Code'
+    msg['From'] = sender
+    msg['To'] = user.email
+
+    try:
+        # If the password is a placeholder, log instead of connecting to avoid crash
+        if password == "dummy_app_password":
+            current_app.logger.info(f"DUMMY EMAIL LOG - To: {user.email}, OTP: {otp}")
+        else:
+            server = smtplib.SMTP(host, port)
+            if use_tls:
+                server.starttls()
+            server.login(sender, password)
+            server.send_message(msg)
+            server.quit()
+    except Exception as e:
+        current_app.logger.error(f"Failed to send email: {str(e)}")
+        return jsonify({"error": "Failed to send email. Check credentials."}), 500
+
+    return jsonify({"success": True, "message": "Verification code sent to your email"})
+
+
+@auth_bp.route("/verify-email/confirm", methods=["POST"])
+@auth_required
+def confirm_verification_email():
+    data = request.json or {}
+    code = data.get("code")
+    if not code:
+        return jsonify({"error": "OTP code is required"}), 400
+
+    user = Profile.query.get(request.user_id)
+    if not user:
+        return jsonify({"error": "Not found"}), 404
+
+    if user.is_verified:
+        return jsonify({"success": True, "message": "Already verified"})
+
+    if not user.otp_code or not user.otp_expiry:
+        return jsonify({"error": "No OTP requested"}), 400
+
+    if datetime.utcnow() > user.otp_expiry:
+        return jsonify({"error": "OTP has expired"}), 400
+
+    if user.otp_code != str(code).strip():
+        return jsonify({"error": "Invalid OTP code"}), 400
+
+    user.is_verified = True
+    user.otp_code = None
+    user.otp_expiry = None
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "message": "Email verified successfully",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "university": user.university,
+            "avatar": user.avatar,
+            "isVerified": user.is_verified,
+            "isAdmin": user.is_admin,
+        }
+    })
 
 # ---------- utility: serialize ----------
 def serialize_brand(b: Brand) -> dict:

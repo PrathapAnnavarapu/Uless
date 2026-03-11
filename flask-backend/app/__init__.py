@@ -44,14 +44,20 @@ def create_app():
 
         # Profiles Migration
         profile_cols = [c["name"] for c in inspector.get_columns("profiles")]
-        if "is_admin" not in profile_cols:
-            try:
-                with db.engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE profiles ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
-                    conn.commit()
-                app.logger.info("added profiles.is_admin column")
-            except Exception as e:
-                app.logger.warning("failed to add profiles.is_admin: %s", e)
+        
+        for col_name, col_def in [
+            ("is_admin", "BOOLEAN DEFAULT FALSE"),
+            ("otp_code", "VARCHAR(6)"),
+            ("otp_expiry", "DATETIME")
+        ]:
+            if col_name not in profile_cols:
+                try:
+                    with db.engine.connect() as conn:
+                        conn.execute(text(f"ALTER TABLE profiles ADD COLUMN {col_name} {col_def}"))
+                        conn.commit()
+                    app.logger.info("added profiles.%s column", col_name)
+                except Exception as e:
+                    app.logger.warning("failed to add profiles.%s: %s", col_name, e)
 
         # Deals Migration
         deal_cols = [c["name"] for c in inspector.get_columns("deals")]
