@@ -81,8 +81,9 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
       return
     }
 
-    if (!profile.isVerified) {
+    if (!profile?.isVerified) {
       toast.error("This deal requires a verified student email (.edu)")
+      router.push("/student-verification")
       return
     }
 

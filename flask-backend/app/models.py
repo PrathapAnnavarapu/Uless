@@ -18,6 +18,8 @@ class Profile(db.Model):
     is_verified = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     password_hash = db.Column(db.String(255))  # store hashed password
+    otp_code = db.Column(db.String(6))         # Store the 6 digit verification code
+    otp_expiry = db.Column(db.DateTime)        # Expiration time for OTP
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

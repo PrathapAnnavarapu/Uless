@@ -40,6 +40,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DealCard } from "@/components/deal-card"
+import { BrandCard } from "@/components/brand-card"
+import { CategoryCard } from "@/components/category-card"
 import { ImageUpload } from "@/components/image-upload"
 import Image from "next/image"
 
@@ -399,43 +401,28 @@ export default function AdminDealsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {brands.map((brand) => (
-                <div
-                  key={brand.id}
-                  className="bg-white border border-gray-100 rounded-3xl p-6 relative group transition-all hover:shadow-xl hover:shadow-[#5B48D9]/5 hover:-translate-y-0.5"
-                >
-                  {/* header */}
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden shrink-0">
-                      {brand.logo ? (
-                        <Image src={brand.logo} alt={brand.name} width={56} height={56} className="object-contain" />
-                      ) : (
-                        <span className="text-xl font-bold text-gray-300">{brand.name.charAt(0)}</span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-[#333] truncate">{brand.name}</h3>
-                        {brand.featured && <Star className="w-3 h-3 text-amber-400 shrink-0 fill-amber-400" />}
-                      </div>
-                      <p className="text-xs text-[#888] truncate">{brand.category}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-[#888] line-clamp-2 h-10 mb-4">{brand.tagline || brand.description}</p>
-                  {brand.discount && (
-                    <span className="inline-block text-xs font-bold bg-[#5B48D9]/10 text-[#5B48D9] px-2 py-0.5 rounded-full">
-                      {brand.discount}
-                    </span>
-                  )}
-
-                  {/* action buttons */}
-                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-[#5B48D9] hover:bg-[#5B48D9]/10" onClick={() => openEditBrand(brand)} title="Edit">
+                <div key={brand.id} className="relative group">
+                  <div className="absolute top-3 right-3 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-9 w-9 bg-white/95 hover:bg-white text-[#5B48D9] shadow-xl border border-gray-100"
+                      onClick={(e) => { e.stopPropagation(); openEditBrand(brand) }}
+                      title="Edit Brand"
+                    >
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={() => setDeleteTarget({ type: "brand", id: brand.id, label: brand.name })} title="Delete">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 bg-white/95 hover:bg-red-50 text-red-500 shadow-xl border border-gray-100"
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: "brand", id: brand.id, label: brand.name }) }}
+                      title="Delete Brand"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                  <BrandCard brand={brand} />
                 </div>
               ))}
             </div>
@@ -455,40 +442,28 @@ export default function AdminDealsPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {categories.map((cat) => (
-                <div
-                  key={cat.id}
-                  className="bg-white border border-gray-100 rounded-3xl overflow-hidden relative group transition-all hover:shadow-xl hover:-translate-y-0.5"
-                >
-                  {/* image banner */}
-                  <div className="h-32 bg-gradient-to-br from-[#5B48D9]/10 to-[#5B48D9]/5 relative">
-                    {cat.image ? (
-                      <Image src={cat.image} alt={cat.name} fill className="object-cover" />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-4xl">
-                        🏷️
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                  </div>
-
-                  <div className="p-5">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-bold text-lg text-[#333]">{cat.name}</h3>
-                      <span className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">/{cat.slug}</span>
-                    </div>
-                    {cat.icon && <p className="text-xs text-[#888] mb-1">icon: <span className="font-mono">{cat.icon}</span></p>}
-                    <p className="text-sm text-[#666] line-clamp-2">{cat.description}</p>
-                  </div>
-
-                  {/* action buttons */}
-                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="icon" variant="secondary" className="h-8 w-8 bg-white/90 hover:bg-white text-[#5B48D9]" onClick={() => openEditCategory(cat)} title="Edit">
+                <div key={cat.id} className="relative group">
+                  <div className="absolute top-3 right-3 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-9 w-9 bg-white/95 hover:bg-white text-[#5B48D9] shadow-xl border border-gray-100"
+                      onClick={(e) => { e.stopPropagation(); openEditCategory(cat) }}
+                      title="Edit Category"
+                    >
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 bg-white/90 hover:bg-red-50 text-red-500" onClick={() => setDeleteTarget({ type: "category", id: cat.id, label: cat.name })} title="Delete">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 bg-white/95 hover:bg-red-50 text-red-500 shadow-xl border border-gray-100"
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: "category", id: cat.id, label: cat.name }) }}
+                      title="Delete Category"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                  <CategoryCard category={cat} />
                 </div>
               ))}
             </div>

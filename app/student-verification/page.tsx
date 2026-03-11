@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { API_BASE } from "@/lib/backend"
 
 export default function StudentVerificationPage() {
   // const router = useRouter()
@@ -148,20 +149,78 @@ export default function StudentVerificationPage() {
 
   const [verificationMethod, setVerificationMethod] = useState<"email" | "id">("email")
   const [isUploading, setIsUploading] = useState(false)
+  const [step, setStep] = useState<1 | 2>(1)
+  const [otpCode, setOtpCode] = useState("")
   const { verifyStudent } = useAuth()
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsUploading(true)
 
     try {
-      // In a real app, we would upload the file or verify the email
-      // For now, we'll just simulate a delay and then verify the user
+      const token = localStorage.getItem("uless_auth_token")
+      const response = await fetch(`${API_BASE}/api/auth/verify-email/send`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success(data.message || "Verification code sent to your email")
+        setStep(2)
+      } else {
+        toast.error(data.error || "Failed to send code")
+      }
+    } catch (error) {
+      toast.error("An error occurred while sending the email.")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsUploading(true)
+
+    try {
+      const token = localStorage.getItem("uless_auth_token")
+      const response = await fetch(`${API_BASE}/api/auth/verify-email/confirm`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: otpCode }),
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Student status verified successfully")
+        // Update the context state so it reflects across the app immediately
+        await verifyStudent()
+        router.push("/")
+      } else {
+        toast.error(data.error || "Invalid verification code")
+      }
+    } catch (error) {
+      toast.error("An error occurred during verification.")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleIDUpload = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsUploading(true)
+    // Mock ID Verification for now as we focus on OTP
+    try {
       await new Promise((resolve) => setTimeout(resolve, 1000))
       await verifyStudent()
-    } catch (error) {
-      toast.error("Verification failed. Please try again.")
+      toast.success("ID submitted for review.")
+      router.push("/")
     } finally {
       setIsUploading(false)
     }
@@ -177,16 +236,20 @@ export default function StudentVerificationPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={verificationMethod === "email" ? (step === 1 ? handleSendEmail : handleVerifyOtp) : handleIDUpload} className="space-y-6">
             <RadioGroup
               value={verificationMethod}
-              onValueChange={(value) => setVerificationMethod(value as "email" | "id")}
+              onValueChange={(value) => {
+                setVerificationMethod(value as "email" | "id")
+                // reset step if switching
+                if (value === "email") setStep(1)
+              }}
               className="space-y-3"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="email" id="email" />
                 <Label htmlFor="email" className="flex-1 cursor-pointer">
-                  Verify with university email
+                  Verify with university email (OTP)
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -199,18 +262,34 @@ export default function StudentVerificationPage() {
 
             {verificationMethod === "email" ? (
               <div className="space-y-2">
-                <Label htmlFor="university-email">University Email</Label>
-                <Input id="university-email" type="email" placeholder="your.name@university.edu" required />
-                <p className="text-xs text-gray-500">
-                  We'll send a verification link to your university email address.
-                </p>
+                {step === 1 ? (
+                  <>
+                    <Label htmlFor="university-email">We will send a 6-digit code to your registered .edu email.</Label>
+                    <p className="text-xs text-gray-500 mb-2">
+                       If you are not using a real SMTP server in development, check the server console logs for the code.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Label htmlFor="otp">Enter 6-Digit Code</Label>
+                    <Input 
+                      id="otp" 
+                      type="text" 
+                      placeholder="123456" 
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      maxLength={6}
+                      required 
+                    />
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="student-id">Student ID Card</Label>
                 <div className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover:bg-gray-50">
                   <p className="text-sm text-gray-500">Click to upload or drag and drop your student ID</p>
-                  <Input id="student-id" type="file" className="hidden" accept="image/*" required />
+                  <Input id="student-id" type="file" className="hidden" accept="image/*" />
                 </div>
                 <p className="text-xs text-gray-500">
                   Please upload a clear image of your student ID card. We'll verify your student status within 24 hours.
@@ -219,7 +298,11 @@ export default function StudentVerificationPage() {
             )}
 
             <Button type="submit" className="w-full bg-[#5B48D9] hover:bg-[#4a3ac0]" disabled={isUploading}>
-              {isUploading ? "Verifying..." : "Verify Student Status"}
+              {isUploading ? "Processing..." : (
+                verificationMethod === "email" ? (
+                  step === 1 ? "Send Verification Code" : "Verify Code"
+                ) : "Upload and Verify"
+              )}
             </Button>
           </form>
         </CardContent>
