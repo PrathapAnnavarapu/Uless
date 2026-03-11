@@ -21,6 +21,17 @@ class Profile(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Category(db.Model):
+    __tablename__ = "categories"
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    name = db.Column(db.String(120), nullable=False)
+    slug = db.Column(db.String(120), unique=True, nullable=False)
+    icon = db.Column(db.String(50))
+    description = db.Column(db.Text)
+    image = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class Brand(db.Model):
     __tablename__ = "brands"
     id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
@@ -29,7 +40,13 @@ class Brand(db.Model):
     logo = db.Column(db.String(255))
     category = db.Column(db.String(120))
     tagline = db.Column(db.String(255))
+    parent_company = db.Column(db.String(255))
     description = db.Column(db.Text)
+    benefits = db.Column(db.Text)  # stored as JSON string
+    original_price = db.Column(db.String(50))
+    student_price = db.Column(db.String(50))
+    discount = db.Column(db.String(50))
+    link = db.Column(db.String(255))
     product_image = db.Column(db.String(255))
     promo_code = db.Column(db.String(120))
     referral_link = db.Column(db.String(255))

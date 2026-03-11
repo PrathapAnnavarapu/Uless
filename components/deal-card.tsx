@@ -16,9 +16,11 @@ import { useSavedDeals } from "@/contexts/saved-deals-context"
 
 interface DealCardProps {
   deal: Deal
+  onClick?: () => void
+  onSave?: (e: React.MouseEvent) => void
 }
 
-export function DealCard({ deal }: DealCardProps) {
+export function DealCard({ deal, onClick, onSave }: DealCardProps) {
   const router = useRouter()
   const { isAuthenticated } = useAuth()
   const { isSaved, toggleSaved } = useSavedDeals()
@@ -26,6 +28,11 @@ export function DealCard({ deal }: DealCardProps) {
 
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation()
+
+    if (onSave) {
+      onSave(e)
+      return
+    }
 
     if (!isAuthenticated) {
       toast.info("Please sign in to save deals")
@@ -38,6 +45,10 @@ export function DealCard({ deal }: DealCardProps) {
   }
 
   const handleClick = () => {
+    if (onClick) {
+      onClick()
+      return
+    }
     router.push(`/deals/${deal.id}`)
   }
 
