@@ -6,14 +6,27 @@ from flask_migrate import Migrate
 db = SQLAlchemy()
 migrate = Migrate()
 
-
 def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
 
+    # 1. DISABLE STRICT SLASHES
+    # This prevents 301 redirects if you call /api/categories/ instead of /api/categories
+    # Redirects are forbidden during CORS preflight requests.
+    app.url_map.strict_slashes = False
+
+    # 2. INITIALIZE CORS EARLY
+    # Putting this before Blueprints ensures all responses get the correct headers.
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}},
+        supports_credentials=True,
+    )
+
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # 3. REGISTER BLUEPRINTS
     from .routes import auth_bp, brands_bp, deals_bp, categories_bp, upload_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -25,14 +38,11 @@ def create_app():
     with app.app_context():
         from sqlalchemy import text, inspect
 
-        # ── ensure all tables exist (safe: create_all is idempotent) ──────────
+        # --- Database Migrations Logic ---
         db.create_all()
-
-        # ── runtime column migrations (for existing DBs that predate model changes) ──
-
         inspector = inspect(db.engine)
 
-        # profiles.is_admin
+        # Profiles Migration
         profile_cols = [c["name"] for c in inspector.get_columns("profiles")]
         if "is_admin" not in profile_cols:
             try:
@@ -43,7 +53,7 @@ def create_app():
             except Exception as e:
                 app.logger.warning("failed to add profiles.is_admin: %s", e)
 
-        # deals: image, category, brand_logo
+        # Deals Migration
         deal_cols = [c["name"] for c in inspector.get_columns("deals")]
         for col_name, col_def in [
             ("image", "VARCHAR(255)"),
@@ -59,7 +69,7 @@ def create_app():
                 except Exception as e:
                     app.logger.warning("failed to add deals.%s: %s", col_name, e)
 
-        # brands: extra columns added after initial release
+        # Brands Migration
         brand_cols = [c["name"] for c in inspector.get_columns("brands")]
         for col_name, col_def in [
             ("parent_company", "VARCHAR(255)"),
@@ -80,11 +90,5 @@ def create_app():
                     app.logger.info("added brands.%s column", col_name)
                 except Exception as e:
                     app.logger.warning("failed to add brands.%s: %s", col_name, e)
-
-    CORS(
-        app,
-        resources={r"/api/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}},
-        supports_credentials=True,
-    )
 
     return app
