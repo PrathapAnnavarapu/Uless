@@ -3,11 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate
 
-# global database instance
-# import.com later to avoid circular imports
-
 db = SQLAlchemy()
-# migration helper (initialized in factory)
 migrate = Migrate()
 
 
@@ -16,76 +12,79 @@ def create_app():
     app.config.from_object("config.Config")
 
     db.init_app(app)
-    # attach migrations after db is set up
     migrate.init_app(app, db)
 
-    # register blueprints after db is initialized
-    from .routes import auth_bp, brands_bp, deals_bp
+    from .routes import auth_bp, brands_bp, deals_bp, categories_bp, upload_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(brands_bp, url_prefix="/api/brands")
     app.register_blueprint(deals_bp, url_prefix="/api/deals")
+    app.register_blueprint(categories_bp, url_prefix="/api/categories")
+    app.register_blueprint(upload_bp, url_prefix="/api/upload")
 
-    # if we added new columns to models after initial table creation, attempt a simple migration
     with app.app_context():
-        # check whether the new `is_admin` column exists before altering
-        from sqlalchemy import text
-        try:
-            # SQLAlchemy 2.x requires a connection object
-            with db.engine.connect() as conn:
-                conn.execute(text("SELECT is_admin FROM profiles LIMIT 1"))
-        except Exception as check_err:
-            # column likely missing, try to add it explicitly
+        from sqlalchemy import text, inspect
+
+        # ── ensure all tables exist (safe: create_all is idempotent) ──────────
+        db.create_all()
+
+        # ── runtime column migrations (for existing DBs that predate model changes) ──
+
+        inspector = inspect(db.engine)
+
+        # profiles.is_admin
+        profile_cols = [c["name"] for c in inspector.get_columns("profiles")]
+        if "is_admin" not in profile_cols:
             try:
                 with db.engine.connect() as conn:
-                    conn.execute(text(
-                        "ALTER TABLE profiles ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"
-                    ))
+                    conn.execute(text("ALTER TABLE profiles ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
+                    conn.commit()
                 app.logger.info("added profiles.is_admin column")
-            except Exception as alter_err:
-                # log failure so we can diagnose
-                app.logger.warning("failed to add profiles.is_admin column: %s", alter_err)
+            except Exception as e:
+                app.logger.warning("failed to add profiles.is_admin: %s", e)
 
-        # also ensure any new deal columns exist to avoid migration pain
-        try:
-            with db.engine.connect() as conn:
-                conn.execute(text("SELECT image, category, brand_logo FROM deals LIMIT 1"))
-        except Exception:
-            # add columns one by one if they do not exist
-            for col_sql in [
-                "ALTER TABLE deals ADD COLUMN image VARCHAR(255)",
-                "ALTER TABLE deals ADD COLUMN category VARCHAR(120)",
-                "ALTER TABLE deals ADD COLUMN brand_logo VARCHAR(255)"
-            ]:
+        # deals: image, category, brand_logo
+        deal_cols = [c["name"] for c in inspector.get_columns("deals")]
+        for col_name, col_def in [
+            ("image", "VARCHAR(255)"),
+            ("category", "VARCHAR(120)"),
+            ("brand_logo", "VARCHAR(255)"),
+        ]:
+            if col_name not in deal_cols:
                 try:
                     with db.engine.connect() as conn:
-                        conn.execute(text(col_sql))
-                    app.logger.info(f"added deals.{col_sql.split()[-1]} column")
-                except Exception as alter_err:
-                    app.logger.warning("failed to add deal column: %s", alter_err)
+                        conn.execute(text(f"ALTER TABLE deals ADD COLUMN {col_name} {col_def}"))
+                        conn.commit()
+                    app.logger.info("added deals.%s column", col_name)
+                except Exception as e:
+                    app.logger.warning("failed to add deals.%s: %s", col_name, e)
 
-        # ensure brand columns exist as well
-        try:
-            with db.engine.connect() as conn:
-                conn.execute(text("SELECT parent_company, benefits, original_price, student_price, discount, link, product_image FROM brands LIMIT 1"))
-        except Exception:
-            for col_sql in [
-                "ALTER TABLE brands ADD COLUMN parent_company VARCHAR(255)",
-                "ALTER TABLE brands ADD COLUMN benefits TEXT",
-                "ALTER TABLE brands ADD COLUMN original_price VARCHAR(50)",
-                "ALTER TABLE brands ADD COLUMN student_price VARCHAR(50)",
-                "ALTER TABLE brands ADD COLUMN discount VARCHAR(50)",
-                "ALTER TABLE brands ADD COLUMN link VARCHAR(255)",
-                "ALTER TABLE brands ADD COLUMN product_image VARCHAR(255)"
-            ]:
+        # brands: extra columns added after initial release
+        brand_cols = [c["name"] for c in inspector.get_columns("brands")]
+        for col_name, col_def in [
+            ("parent_company", "VARCHAR(255)"),
+            ("benefits", "TEXT"),
+            ("original_price", "VARCHAR(50)"),
+            ("student_price", "VARCHAR(50)"),
+            ("discount", "VARCHAR(50)"),
+            ("link", "VARCHAR(255)"),
+            ("product_image", "VARCHAR(255)"),
+            ("promo_code", "VARCHAR(120)"),
+            ("referral_link", "VARCHAR(255)"),
+        ]:
+            if col_name not in brand_cols:
                 try:
                     with db.engine.connect() as conn:
-                        conn.execute(text(col_sql))
-                    app.logger.info(f"added brands.{col_sql.split()[-1]} column")
-                except Exception as alter_err:
-                    app.logger.warning("failed to add brand column: %s", alter_err)
-        
+                        conn.execute(text(f"ALTER TABLE brands ADD COLUMN {col_name} {col_def}"))
+                        conn.commit()
+                    app.logger.info("added brands.%s column", col_name)
+                except Exception as e:
+                    app.logger.warning("failed to add brands.%s: %s", col_name, e)
 
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}},
+        supports_credentials=True,
+    )
 
     return app

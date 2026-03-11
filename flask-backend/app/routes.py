@@ -1,21 +1,27 @@
 from flask import Blueprint, request, jsonify, current_app
 from . import db
-from .models import Profile, Brand, Deal
+from .models import Profile, Brand, Deal, Category
 from werkzeug.security import generate_password_hash, check_password_hash
-# jwt library comes from PyJWT package
+from werkzeug.utils import secure_filename
 import jwt
+import json
 import os
+import uuid
 from datetime import datetime, timedelta
+from functools import wraps
 
 auth_bp = Blueprint("auth", __name__)
 brands_bp = Blueprint("brands", __name__)
 deals_bp = Blueprint("deals", __name__)
+categories_bp = Blueprint("categories", __name__)
+upload_bp = Blueprint("upload", __name__)
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-me")
 
 
 # ---------- helpers ----------
 def auth_required(f):
+    @wraps(f)
     def wrapper(*args, **kwargs):
         token = request.headers.get("Authorization")
         if token and token.startswith("Bearer "):
@@ -26,24 +32,22 @@ def auth_required(f):
         except Exception:
             return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
-    wrapper.__name__ = f.__name__
     return wrapper
 
 
 def admin_required(f):
+    @wraps(f)
     @auth_required
     def wrapper(*args, **kwargs):
         user = Profile.query.get(request.user_id)
         if not user or not user.is_admin:
             return jsonify({"error": "Forbidden"}), 403
         return f(*args, **kwargs)
-    wrapper.__name__ = f.__name__
     return wrapper
 
 
 # ---------- auth routes ----------
 
-# profile endpoints
 @auth_bp.route("/profile", methods=["GET", "PUT"])
 @auth_required
 def profile():
@@ -62,7 +66,6 @@ def profile():
             "isAdmin": user.is_admin,
         })
 
-    # PUT -> update
     data = request.json or {}
     if "name" in data:
         user.name = data["name"]
@@ -83,6 +86,7 @@ def profile():
             "isAdmin": user.is_admin,
         },
     })
+
 
 @auth_bp.route("/signup", methods=["POST"])
 def signup():
@@ -106,7 +110,11 @@ def signup():
     )
     db.session.add(user)
     db.session.commit()
-    token = jwt.encode({"id": user.id, "is_admin": user.is_admin, "exp": datetime.utcnow() + timedelta(days=7)}, current_app.config["JWT_SECRET"], algorithm="HS256")
+    token = jwt.encode(
+        {"id": user.id, "is_admin": user.is_admin, "exp": datetime.utcnow() + timedelta(days=7)},
+        current_app.config["JWT_SECRET"],
+        algorithm="HS256",
+    )
     return jsonify({
         "token": token,
         "user": {
@@ -129,8 +137,11 @@ def login():
     user = Profile.query.filter_by(email=email).first()
     if not user or not user.password_hash or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "invalid credentials"}), 401
-    token = jwt.encode({"id": user.id, "is_admin": user.is_admin, "exp": datetime.utcnow() + timedelta(days=7)}, current_app.config["JWT_SECRET"], algorithm="HS256")
-    # return full profile info
+    token = jwt.encode(
+        {"id": user.id, "is_admin": user.is_admin, "exp": datetime.utcnow() + timedelta(days=7)},
+        current_app.config["JWT_SECRET"],
+        algorithm="HS256",
+    )
     return jsonify({
         "token": token,
         "user": {
@@ -145,56 +156,9 @@ def login():
     })
 
 
-# ---------- brand routes ----------
-@brands_bp.route("/", methods=["GET"])
-def list_brands():
-    brands = Brand.query.all()
-    def serialize(b: Brand):
-        return {
-            "id": b.id,
-            "name": b.name,
-            "slug": b.slug,
-            "logo": b.logo,
-            "category": b.category,
-            "tagline": b.tagline,
-            "parentCompany": b.parent_company,
-            "description": b.description,
-            "benefits": json.loads(b.benefits) if b.benefits else [],
-            "originalPrice": b.original_price,
-            "studentPrice": b.student_price,
-            "discount": b.discount,
-            "link": b.link,
-            "productImage": b.product_image,
-            "promoCode": b.promo_code,
-            "referralLink": b.referral_link,
-            "featured": b.featured,
-        }
-    return jsonify([serialize(b) for b in brands])
-
-
-@brands_bp.route("/", methods=["POST"])
-@admin_required
-def create_brand():
-    data = request.json or {}
-    # normalize benefits to JSON string
-    if "benefits" in data and isinstance(data["benefits"], list):
-        data["benefits"] = json.dumps(data["benefits"])
-    brand = Brand(**{k: data[k] for k in [
-        "name", "slug", "logo", "category", "tagline", "parentCompany",
-        "description", "benefits", "originalPrice", "studentPrice", "discount",
-        "link", "product_image", "promo_code", "referral_link", "featured"
-    ] if k in data})
-    db.session.add(brand)
-    db.session.commit()
-    return jsonify({"id": brand.id, "name": brand.name}), 201
-
-
-@brands_bp.route("/<brand_id>", methods=["GET"])
-def get_brand(brand_id):
-    b = Brand.query.get(brand_id)
-    if not b:
-        return jsonify({"error": "Not found"}), 404
-    return jsonify({
+# ---------- utility: serialize ----------
+def serialize_brand(b: Brand) -> dict:
+    return {
         "id": b.id,
         "name": b.name,
         "slug": b.slug,
@@ -212,7 +176,89 @@ def get_brand(brand_id):
         "promoCode": b.promo_code,
         "referralLink": b.referral_link,
         "featured": b.featured,
-    })
+    }
+
+
+def serialize_category(c: Category) -> dict:
+    return {
+        "id": c.id,
+        "name": c.name,
+        "slug": c.slug,
+        "icon": c.icon,
+        "description": c.description,
+        "image": c.image,
+    }
+
+
+def apply_brand_data(b: Brand, data: dict):
+    """Apply camelCase or snake_case brand data to a Brand model instance."""
+    field_map = {
+        "name": "name",
+        "slug": "slug",
+        "logo": "logo",
+        "category": "category",
+        "tagline": "tagline",
+        "parentCompany": "parent_company",
+        "description": "description",
+        "originalPrice": "original_price",
+        "studentPrice": "student_price",
+        "discount": "discount",
+        "link": "link",
+        "productImage": "product_image",
+        "promoCode": "promo_code",
+        "referralLink": "referral_link",
+        "featured": "featured",
+        # also accept snake_case directly
+        "parent_company": "parent_company",
+        "original_price": "original_price",
+        "student_price": "student_price",
+        "product_image": "product_image",
+        "promo_code": "promo_code",
+        "referral_link": "referral_link",
+    }
+    benefits = data.get("benefits")
+    if benefits is not None:
+        if isinstance(benefits, list):
+            b.benefits = json.dumps(benefits)
+        else:
+            b.benefits = benefits
+
+    for camel, snake in field_map.items():
+        if camel in data:
+            setattr(b, snake, data[camel])
+
+
+# ---------- brand routes ----------
+@brands_bp.route("/", methods=["GET"])
+def list_brands():
+    brands = Brand.query.order_by(Brand.name).all()
+    return jsonify([serialize_brand(b) for b in brands])
+
+
+@brands_bp.route("/", methods=["POST"])
+@admin_required
+def create_brand():
+    data = request.json or {}
+    # slug is required
+    if not data.get("name") or not data.get("slug"):
+        return jsonify({"error": "name and slug are required"}), 400
+    existing = Brand.query.filter_by(slug=data["slug"]).first()
+    if existing:
+        return jsonify({"error": "slug already exists"}), 400
+    brand = Brand(name=data["name"], slug=data["slug"])
+    apply_brand_data(brand, data)
+    db.session.add(brand)
+    db.session.commit()
+    return jsonify(serialize_brand(brand)), 201
+
+
+@brands_bp.route("/<brand_id>", methods=["GET"])
+def get_brand(brand_id):
+    b = Brand.query.get(brand_id)
+    if not b:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(serialize_brand(b))
+
 
 @brands_bp.route("/<brand_id>", methods=["PUT"])
 @admin_required
@@ -221,89 +267,163 @@ def update_brand(brand_id):
     if not b:
         return jsonify({"error": "Not found"}), 404
     data = request.json or {}
-    # convert benefits list back to string
-    if "benefits" in data and isinstance(data["benefits"], list):
-        data["benefits"] = json.dumps(data["benefits"])
-    for key in [
-        "name", "slug", "logo", "category", "tagline", "parentCompany",
-        "description", "benefits", "originalPrice", "studentPrice", "discount",
-        "link", "product_image", "promo_code", "referral_link", "featured"
-    ]:
-        if key in data:
-            setattr(b, key, data[key])
+    apply_brand_data(b, data)
     db.session.commit()
-    return jsonify({"success": True, "id": b.id})
+    return jsonify(serialize_brand(b))
+
+
+@brands_bp.route("/<brand_id>", methods=["DELETE"])
+@admin_required
+def delete_brand(brand_id):
+    b = Brand.query.get(brand_id)
+    if not b:
+        return jsonify({"error": "Not found"}), 404
+    # remove related deals first to avoid FK constraint errors
+    for deal in b.deals:
+        db.session.delete(deal)
+    db.session.delete(b)
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+# ---------- category routes ----------
+@categories_bp.route("/", methods=["GET"])
+def list_categories():
+    cats = Category.query.order_by(Category.name).all()
+    return jsonify([serialize_category(c) for c in cats])
+
+
+@categories_bp.route("/", methods=["POST"])
+@admin_required
+def create_category():
+    data = request.json or {}
+    if not data.get("name") or not data.get("slug"):
+        return jsonify({"error": "name and slug are required"}), 400
+    existing = Category.query.filter_by(slug=data["slug"]).first()
+    if existing:
+        return jsonify({"error": "slug already exists"}), 400
+    cat = Category(
+        name=data["name"],
+        slug=data["slug"],
+        icon=data.get("icon"),
+        description=data.get("description"),
+        image=data.get("image"),
+    )
+    db.session.add(cat)
+    db.session.commit()
+    return jsonify(serialize_category(cat)), 201
+
+
+@categories_bp.route("/<cat_id>", methods=["GET"])
+def get_category(cat_id):
+    c = Category.query.get(cat_id)
+    if not c:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(serialize_category(c))
+
+
+@categories_bp.route("/<cat_id>", methods=["PUT"])
+@admin_required
+def update_category(cat_id):
+    c = Category.query.get(cat_id)
+    if not c:
+        return jsonify({"error": "Not found"}), 404
+    data = request.json or {}
+    for field in ["name", "slug", "icon", "description", "image"]:
+        if field in data:
+            setattr(c, field, data[field])
+    db.session.commit()
+    return jsonify(serialize_category(c))
+
+
+@categories_bp.route("/<cat_id>", methods=["DELETE"])
+@admin_required
+def delete_category(cat_id):
+    c = Category.query.get(cat_id)
+    if not c:
+        return jsonify({"error": "Not found"}), 404
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify({"success": True})
 
 
 # ---------- deals routes ----------
+def serialize_deal(d: Deal) -> dict:
+    return {
+        "id": d.id,
+        "title": d.title,
+        "description": d.description,
+        "image": d.image,
+        "brand": d.brand.name if d.brand else None,
+        "brand_id": d.brand_id,
+        "discount": d.discount,
+        "originalPrice": d.original_price,
+        "studentPrice": d.student_price,
+        "validUntil": d.valid_until.isoformat() if d.valid_until else None,
+        "link": d.link,
+        "category": d.category,
+        "brandLogo": d.brand_logo if d.brand_logo else (d.brand.logo if d.brand else None),
+    }
+
+
+def apply_deal_data(deal: Deal, data: dict):
+    key_map = {
+        "originalPrice": "original_price",
+        "studentPrice": "student_price",
+        "validUntil": "valid_until",
+        "brandLogo": "brand_logo",
+        "brand_id": "brand_id",
+    }
+    normalized = dict(data)
+    for camel, snake in key_map.items():
+        if camel in normalized:
+            normalized[snake] = normalized.pop(camel)
+
+    # sanitize valid_until
+    if "valid_until" in normalized:
+        val = normalized["valid_until"]
+        if isinstance(val, str) and val:
+            try:
+                normalized["valid_until"] = datetime.fromisoformat(val).date()
+            except Exception:
+                normalized["valid_until"] = None
+        else:
+            normalized["valid_until"] = None
+
+    # resolve brand name → brand_id
+    if "brand" in normalized and "brand_id" not in normalized:
+        name = normalized.get("brand")
+        brand = Brand.query.filter_by(name=name).first()
+        if not brand:
+            brand = Brand(name=name, slug=name.lower().replace(" ", "-"))
+            db.session.add(brand)
+            db.session.flush()
+        normalized["brand_id"] = brand.id
+
+    for key in ["brand_id", "title", "description", "discount", "original_price",
+                "student_price", "valid_until", "link", "image", "category", "brand_logo"]:
+        if key in normalized:
+            setattr(deal, key, normalized[key])
+
+
 @deals_bp.route("/all", methods=["GET"])
 def list_deals():
-    # return deal information along with the brand name for convenience
     deals = Deal.query.join(Brand).all()
-    result = []
-    for d in deals:
-        result.append({
-            "id": d.id,
-            "title": d.title,
-            "description": d.description,
-            "image": d.link,  # placeholder; adjust if you store images later            
-            "brand": d.brand.name if d.brand else None,
-            "brand_id": d.brand_id,
-            "discount": d.discount,
-            "originalPrice": d.original_price,
-            "studentPrice": d.student_price,
-            "validUntil": d.valid_until.isoformat() if d.valid_until else None,
-            "link": d.link,
-            "category": d.category,
-            "brandLogo": d.brand.logo if d.brand else None,
-        })
-    return jsonify(result)
+    return jsonify([serialize_deal(d) for d in deals])
 
 
 @deals_bp.route("/", methods=["POST"])
 @admin_required
 def create_deal():
     data = request.json or {}
-    # allow camelCase fields by normalizing
-    key_map = {
-        "originalPrice": "original_price",
-        "studentPrice": "student_price",
-        "validUntil": "valid_until",
-        "brandLogo": "brand_logo",
-    }
-    for old, new in key_map.items():
-        if old in data:
-            data[new] = data.pop(old)
-
-    # clean up valid_until value: only accept ISO date, otherwise drop
-    if "valid_until" in data:
-        val = data.get("valid_until")
-        if isinstance(val, str):
-            try:
-                # allow both date and datetime strings
-                parsed = datetime.fromisoformat(val)
-                data["valid_until"] = parsed.date()
-            except Exception:
-                data["valid_until"] = None
-        else:
-            data["valid_until"] = None
-
-    # if brand name provided instead of id, resolve or create
-    if "brand" in data and "brand_id" not in data:
-        name = data.get("brand")
-        brand = Brand.query.filter_by(name=name).first()
-        if not brand:
-            brand = Brand(name=name, slug=name.lower().replace(" ", "-"))
-            db.session.add(brand)
-            db.session.flush()
-        data["brand_id"] = brand.id
-    deal = Deal(**{k: data[k] for k in [
-        "brand_id", "title", "description", "discount", "original_price",
-        "student_price", "valid_until", "link", "image", "category", "brand_logo"
-    ] if k in data})
+    # need at least a brand
+    deal = Deal(brand_id="__placeholder__")
+    apply_deal_data(deal, data)
+    if not deal.brand_id or deal.brand_id == "__placeholder__":
+        return jsonify({"error": "brand or brand_id is required"}), 400
     db.session.add(deal)
     db.session.commit()
-    return jsonify({"id": deal.id, "title": deal.title}), 201
+    return jsonify(serialize_deal(deal)), 201
 
 
 @deals_bp.route("/<deal_id>", methods=["GET"])
@@ -311,20 +431,7 @@ def get_deal(deal_id):
     deal = Deal.query.get(deal_id)
     if not deal:
         return jsonify({"error": "Not found"}), 404
-    return jsonify({
-        "id": deal.id,
-        "title": deal.title,
-        "description": deal.description,
-        "brand_id": deal.brand_id,
-        "discount": deal.discount,
-        "originalPrice": deal.original_price,
-        "studentPrice": deal.student_price,
-        "validUntil": deal.valid_until.isoformat() if deal.valid_until else None,
-        "link": deal.link,
-        "image": deal.image,
-        "category": deal.category,
-        "brandLogo": deal.brand_logo,
-    })
+    return jsonify(serialize_deal(deal))
 
 
 @deals_bp.route("/<deal_id>", methods=["PUT"])
@@ -334,41 +441,59 @@ def update_deal(deal_id):
     if not deal:
         return jsonify({"error": "Not found"}), 404
     data = request.json or {}
-    # normalize camelCase keys first
-    key_map = {
-        "originalPrice": "original_price",
-        "studentPrice": "student_price",
-        "validUntil": "valid_until",
-        "brandLogo": "brand_logo",
-    }
-    for old, new in key_map.items():
-        if old in data:
-            data[new] = data.pop(old)
-    # sanitize valid_until
-    if "valid_until" in data:
-        val = data.get("valid_until")
-        if isinstance(val, str):
-            try:
-                parsed = datetime.fromisoformat(val)
-                data["valid_until"] = parsed.date()
-            except Exception:
-                data["valid_until"] = None
-        else:
-            data["valid_until"] = None
-    # handle brand change
-    if "brand" in data and "brand_id" not in data:
-        name = data.get("brand")
-        brand = Brand.query.filter_by(name=name).first()
-        if not brand:
-            brand = Brand(name=name, slug=name.lower().replace(" ", "-"))
-            db.session.add(brand)
-            db.session.flush()
-        data["brand_id"] = brand.id
-    for key in [
-        "brand_id", "title", "description", "discount", "original_price",
-        "student_price", "valid_until", "link", "image", "category", "brand_logo"
-    ]:
-        if key in data:
-            setattr(deal, key, data[key])
+    apply_deal_data(deal, data)
     db.session.commit()
-    return jsonify({"success": True, "id": deal.id})
+    return jsonify(serialize_deal(deal))
+
+
+@deals_bp.route("/<deal_id>", methods=["DELETE"])
+@admin_required
+def delete_deal(deal_id):
+    deal = Deal.query.get(deal_id)
+    if not deal:
+        return jsonify({"error": "Not found"}), 404
+    db.session.delete(deal)
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+# ---------- upload route ----------
+def _allowed_file(filename: str) -> bool:
+    allowed = current_app.config.get("ALLOWED_EXTENSIONS", {"png", "jpg", "jpeg", "gif", "webp", "svg", "avif"})
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed
+
+
+@upload_bp.route("/", methods=["POST"])
+@admin_required
+def upload_file():
+    """
+    POST /api/upload
+    Body: multipart/form-data  { file: <binary> }
+    Returns: { url: "/uploads/<uuid>.<ext>" }
+
+    The file is saved into <project_root>/public/uploads/ so Next.js serves it
+    at http://localhost:3000/uploads/<filename>.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file field in request"}), 400
+
+    file = request.files["file"]
+    if not file or file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    if not _allowed_file(file.filename):
+        return jsonify({"error": "File type not allowed. Use PNG, JPG, GIF, WEBP, SVG or AVIF."}), 400
+
+    # Build a safe, unique filename: <uuid>.<original_ext>
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    unique_name = f"{uuid.uuid4().hex}.{ext}"
+
+    upload_folder = current_app.config["UPLOAD_FOLDER"]
+    os.makedirs(upload_folder, exist_ok=True)
+
+    save_path = os.path.join(upload_folder, unique_name)
+    file.save(save_path)
+
+    # Return the URL path that Next.js will serve
+    url = f"/uploads/{unique_name}"
+    return jsonify({"url": url, "filename": unique_name}), 2

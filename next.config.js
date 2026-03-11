@@ -9,7 +9,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ["blob.v0.dev"],
+    domains: ["blob.v0.dev", "localhost", "127.0.0.1", "images.unsplash.com"],
     unoptimized: true,
   },
   output: "standalone",
