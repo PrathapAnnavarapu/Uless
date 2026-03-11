@@ -229,7 +229,7 @@ def apply_brand_data(b: Brand, data: dict):
 
 
 # ---------- brand routes ----------
-@brands_bp.route("/", methods=["GET"])
+@brands_bp.route("/all", methods=["GET"])
 def list_brands():
     brands = Brand.query.order_by(Brand.name).all()
     return jsonify([serialize_brand(b) for b in brands])
@@ -287,7 +287,7 @@ def delete_brand(brand_id):
 
 
 # ---------- category routes ----------
-@categories_bp.route("/", methods=["GET"])
+@categories_bp.route("/all", methods=["GET"])
 def list_categories():
     cats = Category.query.order_by(Category.name).all()
     return jsonify([serialize_category(c) for c in cats])

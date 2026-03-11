@@ -94,14 +94,14 @@ export default function AdminDealsPage() {
   // ── fetch helpers ─────────────────────────────────────────────────────────
   const fetchBrands = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/brands`)
+      const res = await fetch(`${API_BASE}/api/brands/all`)
       if (res.ok) setBrands(await res.json())
     } catch { /* silent */ }
   }, [])
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/categories`)
+      const res = await fetch(`${API_BASE}/api/categories/all`)
       if (res.ok) {
         const data = await res.json()
         if (Array.isArray(data)) setCategories(data)
