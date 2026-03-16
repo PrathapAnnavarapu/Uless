@@ -17,7 +17,7 @@ interface BrandCardProps {
 }
 
 // In the BrandCard component, update the brand before using it
-export function BrandCard({ brand: originalBrand }: BrandCardProps) {
+export function BrandCard({ brand: originalBrand, onClick }: BrandCardProps) {
   const router = useRouter()
   const [imageError, setImageError] = useState(false)
 
