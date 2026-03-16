@@ -21,6 +21,7 @@ interface DealCardProps {
 }
 
 export function DealCard({ deal, onClick, onSave }: DealCardProps) {
+  console.log(deal)
   const router = useRouter()
   const { isAuthenticated } = useAuth()
   const { isSaved, toggleSaved } = useSavedDeals()

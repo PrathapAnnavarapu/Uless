@@ -9,7 +9,15 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ["blob.v0.dev", "localhost", "127.0.0.1", "images.unsplash.com"],
+    // remotePatterns is the preferred modern way
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**', // This is a wildcard: allows ANY https domain
+      },
+    ],
+    // Keep domains for specific legacy support if needed
+    domains: ["blob.v0.dev", "localhost", "127.0.0.1", "images.unsplash.com", "share.google"],
     unoptimized: true,
   },
   output: "standalone",

@@ -9,6 +9,7 @@ import { Laptop, Music, ShoppingBag, Utensils, Plane, Shirt, Heart, CreditCard, 
 import Link from "next/link"
 import { motion, useInView } from "framer-motion"
 import { CategoryCard } from "@/components/category-card"
+import { useDeals } from "@/hooks/use-deals"
 
 // High-quality category images are now handled via the Category object or fallback in CategoryCard
 
@@ -109,3 +110,5 @@ export function CategoryShowcase() {
     </div>
   )
 }
+
+8367774564
