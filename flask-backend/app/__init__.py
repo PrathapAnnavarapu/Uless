@@ -27,13 +27,14 @@ def create_app():
     migrate.init_app(app, db)
 
     # 3. REGISTER BLUEPRINTS
-    from .routes import auth_bp, brands_bp, deals_bp, categories_bp, upload_bp
+    from .routes import auth_bp, brands_bp, deals_bp, categories_bp, upload_bp, saved_deals_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(brands_bp, url_prefix="/api/brands")
     app.register_blueprint(deals_bp, url_prefix="/api/deals")
     app.register_blueprint(categories_bp, url_prefix="/api/categories")
     app.register_blueprint(upload_bp, url_prefix="/api/upload")
+    app.register_blueprint(saved_deals_bp, url_prefix="/api/saved-deals")
 
     with app.app_context():
         from sqlalchemy import text, inspect

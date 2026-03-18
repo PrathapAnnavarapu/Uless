@@ -89,8 +89,8 @@ export default function AdminDealsPage() {
   const [activeTab, setActiveTab] = useState("deals")
 
   // ── sync forms ───────────────────────────────────────────────────────────
-  useEffect(() => { setDealForm(selectedDeal ?? {}) }, [selectedDeal])
-  useEffect(() => { setBrandForm(selectedBrand ?? { featured: false }) }, [selectedBrand])
+  useEffect(() => { setDealForm(selectedDeal ?? {featured: false}) }, [selectedDeal])
+  useEffect(() => { setBrandForm(selectedBrand ?? { premium: false }) }, [selectedBrand])
   useEffect(() => { setCategoryForm(selectedCategory ?? {}) }, [selectedCategory])
 
   // ── fetch helpers ─────────────────────────────────────────────────────────
@@ -605,6 +605,16 @@ export default function AdminDealsPage() {
                   compact
                 />
               </div>
+              <div className="flex items-center gap-3 pb-2 pt-1">
+              <Switch
+                id="deal-featured"
+                checked={!!dealForm.featured}
+                onCheckedChange={(value) => handleDealChange("featured", value)}
+              />
+              <Label htmlFor="deal-featured" className="font-semibold cursor-pointer">
+                Featured Deal <span className="text-[#888] font-normal text-sm ml-1">(shown in highlighted sections)</span>
+              </Label>
+            </div>
             </div>
           </form>
 
@@ -797,12 +807,12 @@ export default function AdminDealsPage() {
 
             <div className="flex items-center gap-3 pb-2 pt-1">
               <Switch
-                id="brand-featured"
-                checked={!!brandForm.featured}
-                onCheckedChange={(v) => handleBrandChange("featured", v)}
+                id="brand-premium"
+                checked={!!brandForm.premium}
+                onCheckedChange={(v) => handleBrandChange("premium", v)}
               />
-              <Label htmlFor="brand-featured" className="font-semibold cursor-pointer">
-                Featured Brand <span className="text-[#888] font-normal text-sm ml-1">(shown in highlighted sections)</span>
+              <Label htmlFor="brand-premium" className="font-semibold cursor-pointer">
+                Premium Brand <span className="text-[#888] font-normal text-sm ml-1">(shown in highlighted sections)</span>
               </Label>
             </div>
           </form>

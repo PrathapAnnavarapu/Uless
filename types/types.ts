@@ -10,6 +10,7 @@ export interface Deal {
   link?: string
   originalPrice?: string
   studentPrice?: string
+  featured?: boolean
   brandLogo?: string
 }
 
@@ -19,7 +20,7 @@ export interface Category {
   icon: string
   slug: string
   description?: string
-  image?: string
+  image?: string  
 }
 
 export interface Brand {
@@ -34,7 +35,7 @@ export interface Brand {
   parentCompany?: string
   originalPrice?: string
   studentPrice?: string
-  featured?: boolean
+  premium?: boolean
   productImage?: string
   discount?: string
   link?: string

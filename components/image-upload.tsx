@@ -173,13 +173,21 @@ export function ImageUpload({ value, onChange, label, compact = false }: ImageUp
           {/* image preview */}
           {value && !uploading ? (
             <div className="relative w-full h-full">
-              <Image
-                src={value}
-                alt="Preview"
-                fill
-                className="object-cover rounded-2xl"
-                unoptimized
-              />
+              <img
+      src={value}
+      alt="Preview"
+      // Use standard CSS for the "fill" effect
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        borderRadius: '1rem' 
+      }}
+      // This helps catch if the URL is actually broken
+      onError={(e) => {
+        console.error("Image failed to load:", value);
+      }}
+    />
               {/* clear button */}
               <button
                 type="button"

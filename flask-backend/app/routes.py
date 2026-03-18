@@ -18,6 +18,7 @@ brands_bp = Blueprint("brands", __name__)
 deals_bp = Blueprint("deals", __name__)
 categories_bp = Blueprint("categories", __name__)
 upload_bp = Blueprint("upload", __name__)
+saved_deals_bp = Blueprint("saved_deals_bp", __name__)
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-me")
 
@@ -262,7 +263,7 @@ def serialize_brand(b: Brand) -> dict:
         "productImage": b.product_image,
         "promoCode": b.promo_code,
         "referralLink": b.referral_link,
-        "featured": b.featured,
+        "premium": b.premium,
     }
 
 
@@ -294,7 +295,7 @@ def apply_brand_data(b: Brand, data: dict):
         "productImage": "product_image",
         "promoCode": "promo_code",
         "referralLink": "referral_link",
-        "featured": "featured",
+        "premium": "premium",
         # also accept snake_case directly
         "parent_company": "parent_company",
         "original_price": "original_price",
@@ -449,6 +450,7 @@ def serialize_deal(d: Deal) -> dict:
         "validUntil": d.valid_until.isoformat() if d.valid_until else None,
         "link": d.link,
         "category": d.category,
+        "featured": d.featured,
         "brandLogo": d.brand_logo if d.brand_logo else (d.brand.logo if d.brand else None),
     }
 
@@ -488,7 +490,7 @@ def apply_deal_data(deal: Deal, data: dict):
         normalized["brand_id"] = brand.id
 
     for key in ["brand_id", "title", "description", "discount", "original_price",
-                "student_price", "valid_until", "link", "image", "category", "brand_logo"]:
+                "student_price", "valid_until", "link", "image", "category", "featured", "brand_logo"]:
         if key in normalized:
             setattr(deal, key, normalized[key])
 
@@ -542,6 +544,78 @@ def delete_deal(deal_id):
     db.session.delete(deal)
     db.session.commit()
     return jsonify({"success": True})
+
+
+
+
+# ---------- saved delas route ----------
+@saved_deals_bp.route("/all", methods=["GET"])
+def get_saved_deals():
+    deals = SavedDeals.query.order_by(SavedDeals.created_at.desc()).all()
+
+    return jsonify([
+        {
+            "id": d.id,
+            "title": d.title,
+            "description": d.description,
+            "discount": d.discount,
+            "original_price": d.original_price,
+            "student_price": d.student_price,
+            "valid_until": d.valid_until.isoformat() if d.valid_until else None,
+            "link": d.link,
+            "image": d.image,
+            "category": d.category,
+            "brand_logo": d.brand_logo,
+            "featured": d.featured,
+        }
+        for d in deals
+    ])
+
+# ✅ Save a deal
+@saved_deals_bp.route("/", methods=["POST"])
+def save_deal():
+    data = request.json
+
+    # prevent duplicates
+    existing = SavedDeals.query.filter_by(id=data.get("id")).first()
+    if existing:
+        return jsonify({"message": "Deal already saved"}), 200
+
+    deal = SavedDeals(
+        id=data.get("id"),
+        brand_id=data.get("brand_id"),
+        title=data.get("title"),
+        description=data.get("description"),
+        discount=data.get("discount"),
+        original_price=data.get("original_price"),
+        student_price=data.get("student_price"),
+        valid_until=datetime.fromisoformat(data["valid_until"]) if data.get("valid_until") else None,
+        link=data.get("link"),
+        image=data.get("image"),
+        category=data.get("category"),
+        brand_logo=data.get("brand_logo"),
+        featured=data.get("featured", False),
+    )
+
+    db.session.add(deal)
+    db.session.commit()
+
+    return jsonify({"message": "Deal saved successfully"}), 201
+
+
+# ✅ Delete a saved deal
+@saved_deals_bp.route("/<string:id>", methods=["DELETE"])
+def delete_saved_deal(id):
+    deal = SavedDeals.query.get(id)
+
+    if not deal:
+        return jsonify({"message": "Deal not found"}), 404
+
+    db.session.delete(deal)
+    db.session.commit()
+
+    return jsonify({"message": "Deal removed"})
+
 
 
 # ---------- upload route ----------

@@ -100,7 +100,7 @@ export function CategoryShowcase() {
             className="category-card-container"
           >
             <CategoryCard 
-              category={{ id: "all", name: "View All Categories", slug: "all", description: "", image: "https://images.unsplash.com/photo-1607083206968-13611e3d76db?q=80&w=2020&auto=format&fit=crop" }} 
+              category={{ id: "all", name: "View All Categories", slug: "all", description: "", image: "https://images.unsplash.com/photo-1607083206968-13611e3d76db?q=80&w=2020&auto=format&fit=crop" , icon: "grid"}} 
               dealCount={totalDeals} 
               href="/categories" 
             />
@@ -111,4 +111,8 @@ export function CategoryShowcase() {
   )
 }
 
-8367774564
+
+
+// flask db init     
+// flask db migrate -m "migrste models"    
+// flask db upgrade  
