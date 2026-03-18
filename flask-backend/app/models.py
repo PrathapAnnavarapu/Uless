@@ -52,7 +52,7 @@ class Brand(db.Model):
     product_image = db.Column(db.String(255))
     promo_code = db.Column(db.String(120))
     referral_link = db.Column(db.String(255))
-    featured = db.Column(db.Boolean, default=False)
+    premium = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -70,6 +70,26 @@ class Deal(db.Model):
     image = db.Column(db.String(255))
     category = db.Column(db.String(120))
     brand_logo = db.Column(db.String(255))
+    featured = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
     brand = db.relationship("Brand", backref="deals")
+
+
+class SavedDeals(db.Model):
+    __tablename__ = "saved_deals"
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    brand_id = db.Column(db.String(36), db.ForeignKey("brands.id"), nullable=False)
+    title = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    discount = db.Column(db.String(50))
+    original_price = db.Column(db.String(50))
+    student_price = db.Column(db.String(50))
+    valid_until = db.Column(db.Date)
+    link = db.Column(db.String(255))
+    image = db.Column(db.String(255))
+    category = db.Column(db.String(120))
+    brand_logo = db.Column(db.String(255))
+    featured = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

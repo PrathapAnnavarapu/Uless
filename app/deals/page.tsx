@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo} from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DealCard } from "@/components/deal-card"
@@ -12,41 +12,32 @@ import { Search } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { PageSEO } from "@/components/seo/page-seo"
 import { SchemaMarkup } from "@/components/seo/schema-markup"
+import { useDealsContext } from "@/contexts/deals-context"
 
 export default function AllDealsPage() {
   const searchParams = useSearchParams()
+  const { deals, loading } = useDealsContext()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [selectedSort, setSelectedSort] = useState(searchParams.get("sort") || "default")
-  const [allDeals, setAllDeals] = useState<any[]>([])
-  const [filteredDeals, setFilteredDeals] = useState<any[]>([])
+  
 
   // Scroll to top on page load and fetch deals from backend
   useEffect(() => {
-    window.scrollTo(0, 0)
-
-    const fetchDeals = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/deals/all`)
-        const data = await res.json()
-        setAllDeals(data)
-        setFilteredDeals(data)
-      } catch (err) {
-        console.error("Failed to load deals", err)
-      }
-    }
-
-    fetchDeals()
+    window.scrollTo(0, 0)    
   }, [])
 
+  
   // Filter and sort deals based on search query, selected category, and sort option
-  useEffect(() => {
-    let filtered = [...allDeals]
+  const filteredDeals = useMemo(() => {
+    if (!deals) return []
+
+    let result = [...deals]
 
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
+      result = result.filter(
         (deal) =>
           deal.title.toLowerCase().includes(query) ||
           deal.description.toLowerCase().includes(query) ||
@@ -56,31 +47,31 @@ export default function AllDealsPage() {
 
     // Filter by category
     if (selectedCategory !== "All") {
-      filtered = filtered.filter((deal) => deal.category === selectedCategory)
+      result = result.filter((deal) => deal.category === selectedCategory)
     }
 
     // Sort deals
     if (selectedSort === "trending") {
-      filtered.sort((a, b) => {
-        // Sort by newest first (using validUntil as a proxy for recency)
-        const dateA = new Date(a.validUntil.split("/").reverse().join("-"))
-        const dateB = new Date(b.validUntil.split("/").reverse().join("-"))
+      result.sort((a, b) => {
+        const dateA = new Date(a.validUntil?.split("/").reverse().join("-") || 0)
+        const dateB = new Date(b.validUntil?.split("/").reverse().join("-") || 0)
         return dateB.getTime() - dateA.getTime()
       })
     } else if (selectedSort === "discount") {
-      filtered.sort((a, b) => {
-        // Sort by discount percentage (higher first)
-        const getDiscountPercent = (deal: any) => {
-          const discountText = deal.discount
-          const match = discountText.match(/(\d+)%/)
-          return match ? Number.parseInt(match[1]) : 0
-        }
-        return getDiscountPercent(b) - getDiscountPercent(a)
+      result.sort((a, b) => {
+        const getPercent = (d: any) => parseInt(d.discount?.match(/\d+/)?.[0] || "0")
+        return getPercent(b) - getPercent(a)
       })
     }
 
-    setFilteredDeals(filtered)
-  }, [searchQuery, selectedCategory, selectedSort])
+    return result
+  }, [deals, searchQuery, selectedCategory, selectedSort])
+
+  // 3. Extract unique categories from the main deals list for the filter buttons
+  const categories = useMemo(() => {
+    const unique = Array.from(new Set(deals?.map((d) => d.category)))
+    return unique.filter(Boolean)
+  }, [deals])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -195,18 +186,18 @@ export default function AllDealsPage() {
                 All
               </Button>
 
-              {mockCategories.map((category) => (
+              {filteredDeals.map((category) => (
                 <Button
                   key={category.id}
-                  variant={selectedCategory === category.name ? "default" : "outline"}
+                  variant={selectedCategory === category.category ? "default" : "outline"}
                   className={`rounded-xl px-4 py-2 whitespace-nowrap ${
-                    selectedCategory === category.name
+                    selectedCategory === category.category
                       ? "bg-[#5B48D9] text-white hover:bg-[#4a3ac0]"
                       : "border-[#e0e0e0] text-[#666] hover:bg-[#f8faff]"
                   }`}
-                  onClick={() => setSelectedCategory(category.name)}
+                  onClick={() => setSelectedCategory(category.category)}
                 >
-                  {category.name}
+                  {category.category}
                 </Button>
               ))}
             </div>

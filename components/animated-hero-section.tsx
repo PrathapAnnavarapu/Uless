@@ -13,14 +13,14 @@ export function AnimatedHeroSection() {
 
   // Floating animation for the background elements
   const floatingAnimation = {
-    y: [0, -10, 0],
-    transition: {
-      duration: 4,
-      repeat: Number.POSITIVE_INFINITY,
-      repeatType: "reverse" as const,
-      ease: "easeInOut",
-    },
-  }
+  y: [0, -10, 0],
+  transition: {
+    duration: 2, 
+    repeat: Number.POSITIVE_INFINITY,
+    repeatType: "reverse" as const,
+    ease: "easeInOut",
+  },
+}
 
   // Staggered entrance for the text elements
   const textVariants = {

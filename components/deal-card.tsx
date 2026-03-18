@@ -20,8 +20,7 @@ interface DealCardProps {
   onSave?: (e: React.MouseEvent) => void
 }
 
-export function DealCard({ deal, onClick, onSave }: DealCardProps) {
-  console.log(deal)
+export function DealCard({ deal, onClick, onSave }: DealCardProps) {  
   const router = useRouter()
   const { isAuthenticated } = useAuth()
   const { isSaved, toggleSaved } = useSavedDeals()
