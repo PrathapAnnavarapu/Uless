@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { ArrowLeft, Heart, Share2, ExternalLink, Check, Star, Calendar, Tag, Info } from "lucide-react"
-import { mockBrands } from "@/data/mock-data"
 import { useDeals } from "@/hooks/use-deals"
+import { useBrandsContext } from "@/contexts/brand-context"
 import { useAuth } from "@/contexts/auth-context"
 import { DealCard } from "@/components/deal-card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -21,10 +21,11 @@ export default function BrandDetailPage({ params }: { params: { slug: string } }
   const router = useRouter()
   const [isSaved, setIsSaved] = useState(false)
   const { isAuthenticated, openAuthModal, profile } = useAuth()
+  const { brands, loading: brandsLoading } = useBrandsContext()
   const [isScrolled, setIsScrolled] = useState(false)
 
-  // Find the brand by slug from mock data and ensure it has images
-  const foundBrand = mockBrands.find((b) => b.slug === params.slug)
+  // Find the brand by slug from dynamic data and ensure it has images
+  const foundBrand = brands.find((b) => b.slug === params.slug)
   const brand = foundBrand ? ensureBrandImages(foundBrand) : null
 
   useEffect(() => {
@@ -35,6 +36,14 @@ export default function BrandDetailPage({ params }: { params: { slug: string } }
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  if (brandsLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <h1 className="mb-4 text-2xl font-bold">Loading brand details...</h1>
+      </div>
+    )
+  }
 
   if (!brand) {
     return (
@@ -50,7 +59,7 @@ export default function BrandDetailPage({ params }: { params: { slug: string } }
   const relatedDeals = allDeals.filter((deal) => deal.brand === brand.name).slice(0, 3)
 
   // Find similar brands in the same category
-  const similarBrands = mockBrands.filter((b) => b.category === brand.category && b.id !== brand.id).slice(0, 4)
+  const similarBrands = brands.filter((b) => b.category === brand.category && b.id !== brand.id).slice(0, 4)
 
   const handleSave = () => {
     if (!isAuthenticated) {
@@ -391,8 +400,8 @@ export default function BrandDetailPage({ params }: { params: { slug: string } }
               <div className="p-6 bg-white rounded-xl shadow-sm">
                 <h3 className="mb-4 text-lg font-semibold">Popular Brands</h3>
                 <div className="space-y-3">
-                  {mockBrands
-                    .filter((b) => b.popular)
+                  {brands
+                    .filter((b) => b.premium && b.id !== brand.id)
                     .slice(0, 5)
                     .map((popularBrand) => (
                       <Link

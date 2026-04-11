@@ -4,12 +4,10 @@ import type React from "react"
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { mockCategories, mockDeals } from "@/data/mock-data"
-import { Laptop, Music, ShoppingBag, Utensils, Plane, Shirt, Heart, CreditCard, ChevronRight, Grid } from "lucide-react"
-import Link from "next/link"
 import { motion, useInView } from "framer-motion"
 import { CategoryCard } from "@/components/category-card"
 import { useDeals } from "@/hooks/use-deals"
+import { useCategoryContext } from "@/contexts/category-context"
 
 // High-quality category images are now handled via the Category object or fallback in CategoryCard
 
@@ -19,8 +17,8 @@ export function CategoryShowcase() {
   const isInView = useInView(sectionRef, { once: false, amount: 0.2 })
   const [animationComplete, setAnimationComplete] = useState(false)
 
-  // Calculate accurate deal counts for each category
- const rawDeals = useDeals()
+  const { categories, loading: categoriesLoading } = useCategoryContext()
+  const rawDeals = useDeals()
 
   // Ensure deals is always an array
   const deals = useMemo(() => {
@@ -32,7 +30,7 @@ export function CategoryShowcase() {
     const counts: Record<string, number> = {}
 
     // 1. Safety check for categories
-    const safeCategories = Array.isArray(mockCategories) ? mockCategories : []
+    const safeCategories = Array.isArray(categories) ? categories : []
     safeCategories.forEach((category) => {
       counts[category.name] = 0
     })
@@ -45,10 +43,10 @@ export function CategoryShowcase() {
     })
 
     return counts
-  }, [deals])
+  }, [deals, categories])
 
   // Calculate total number of deals
-  const totalDeals = useMemo(() => mockDeals.length, [])
+  const totalDeals = useMemo(() => deals.length, [deals])
 
   useEffect(() => {
     if (isInView && !animationComplete) {
@@ -75,7 +73,7 @@ export function CategoryShowcase() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, staggerChildren: 0.1 }}
         >
-          {mockCategories.slice(0, 7).map((category, index) => {
+          {categories.slice(0, 7).map((category, index) => {
             const dealCount = categoryDealCounts[category.name] || 0
 
             return (

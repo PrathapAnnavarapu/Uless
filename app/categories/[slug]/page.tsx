@@ -6,7 +6,8 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { BrandCard } from "@/components/brand-card"
-import { mockCategories, mockBrands } from "@/data/mock-data"
+import { useCategoryContext } from "@/contexts/category-context"
+import { useBrandsContext } from "@/contexts/brand-context"
 import { ArrowLeft } from "lucide-react"
 
 interface CategoryPageProps {
@@ -15,23 +16,27 @@ interface CategoryPageProps {
 
 export default function CategoryPage({ params }: CategoryPageProps) {
   const router = useRouter()
+  const { categories, loading: categoriesLoading } = useCategoryContext()
+  const { brands, loading: brandsLoading } = useBrandsContext()
   const [category, setCategory] = useState<any>(null)
   const [categoryBrands, setCategoryBrands] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (categoriesLoading || brandsLoading) return
+
     // Find the category by slug
-    const foundCategory = mockCategories.find((c) => c.slug === params.slug)
+    const foundCategory = categories.find((c) => c.slug === params.slug)
     setCategory(foundCategory)
 
     if (foundCategory) {
       // Find brands in this category
-      const brands = mockBrands.filter((brand) => brand.category === foundCategory.name)
-      setCategoryBrands(brands)
+      const brandsInCategory = brands.filter((brand) => brand.category === foundCategory.name)
+      setCategoryBrands(brandsInCategory)
     }
 
     setLoading(false)
-  }, [params.slug])
+  }, [params.slug, categories, brands, categoriesLoading, brandsLoading])
 
   if (loading) {
     return (
@@ -116,7 +121,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
           <h2 className="mb-8 text-2xl font-bold text-[#333]">Explore Other Categories</h2>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-            {mockCategories
+            {categories
               .filter((c) => c.id !== category.id)
               .slice(0, 4)
               .map((otherCategory) => (

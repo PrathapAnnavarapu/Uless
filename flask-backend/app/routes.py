@@ -657,4 +657,4 @@ def upload_file():
 
     # Return the URL path that Next.js will serve
     url = f"/uploads/{unique_name}"
-    return jsonify({"url": url, "filename": unique_name}), 2
+    return jsonify({"url": url, "filename": unique_name}), 201

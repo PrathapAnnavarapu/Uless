@@ -151,12 +151,38 @@ export default function StudentVerificationPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [step, setStep] = useState<1 | 2>(1)
   const [otpCode, setOtpCode] = useState("")
+  const [timeLeft, setTimeLeft] = useState(600) // 10 minutes in seconds
+  const [canResend, setCanResend] = useState(false)
+  
   const { verifyStudent } = useAuth()
   const router = useRouter()
 
-  const handleSendEmail = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Timer logic for OTP
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (step === 2 && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1)
+      }, 1000)
+    } else if (timeLeft === 0) {
+      setCanResend(true)
+    }
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [step, timeLeft])
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
+  const handleSendEmail = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setIsUploading(true)
+    setCanResend(false)
+    setTimeLeft(600) // Reset timer to 10 mins
 
     try {
       const token = localStorage.getItem("uless_auth_token")
@@ -271,7 +297,12 @@ export default function StudentVerificationPage() {
                   </>
                 ) : (
                   <>
-                    <Label htmlFor="otp">Enter 6-Digit Code</Label>
+                    <div className="flex justify-between items-center mb-1">
+                      <Label htmlFor="otp">Enter 6-Digit Code</Label>
+                      <span className={`text-sm font-medium ${timeLeft < 60 ? "text-red-500 animate-pulse" : "text-gray-500"}`}>
+                        Expiring in: {formatTime(timeLeft)}
+                      </span>
+                    </div>
                     <Input 
                       id="otp" 
                       type="text" 
@@ -279,8 +310,21 @@ export default function StudentVerificationPage() {
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value)}
                       maxLength={6}
+                      className="text-center text-lg tracking-widest"
                       required 
                     />
+                    <div className="flex justify-center mt-2">
+                       <Button 
+                         type="button" 
+                         variant="link" 
+                         size="sm" 
+                         className="text-xs" 
+                         disabled={!canResend || isUploading}
+                         onClick={() => handleSendEmail()}
+                       >
+                         {canResend ? "Didn't receive code? Resend" : `Resend available in ${formatTime(timeLeft)}`}
+                       </Button>
+                    </div>
                   </>
                 )}
               </div>

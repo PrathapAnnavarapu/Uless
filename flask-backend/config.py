@@ -1,4 +1,6 @@
+from sqlalchemy.engine import URL
 import os
+
 
 # Absolute path to the Next.js public/uploads directory so Flask can save there
 # and Next.js serves the files at /uploads/<filename>
@@ -7,8 +9,22 @@ _project_root = os.path.normpath(os.path.join(_here, "..")) # Desktop/Work/Uless
 
 class Config:
     # Example: mysql+pymysql://user:password@localhost/uless_db
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or "mysql+pymysql://root:root@localhost:3306/uless_db"
+    # I've updated this for you:
+    db_url = URL.create(
+        drivername="mysql+pymysql",
+        username="root",
+        password="Prathap@178",
+        host="localhost",
+        port=3306,
+        database="uless_db"
+    )
+
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 3600,
+    }
     JWT_SECRET = os.environ.get("JWT_SECRET", "replace-with-secret")
 
     # File upload: save to Next.js public/uploads so the files are served at /uploads/<name>

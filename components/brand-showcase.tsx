@@ -4,34 +4,30 @@ import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { BrandCard } from "@/components/brand-card"
-import { mockBrands } from "@/data/mock-data"
+import { useBrandsContext } from "@/contexts/brand-context"
 import { ensureBrandImages } from "@/utils/ensure-brand-images"
 
 export function BrandShowcase() {
   const router = useRouter()
-  const [topBrands, setTopBrands] = useState<any[]>([])
-  const [isLoaded, setIsLoaded] = useState(false)
+  const { brands, loading } = useBrandsContext()
 
-  useEffect(() => {
+  const topBrands = useMemo(() => {
     // 1. Guard against non-array data
-    const brandsArray = Array.isArray(mockBrands) ? mockBrands : []
+    const brandsArray = Array.isArray(brands) ? brands : []
 
-    // 2. Filter and Shuffle logic
-    const featured = brandsArray
-      .filter((brand) => brand.featured)
+    // 2. Filter for premium (previously featured) and Shuffle
+    return brandsArray
+      .filter((brand) => brand.premium)
       .sort(() => 0.5 - Math.random())
       .slice(0, 6)
-
-    setTopBrands(featured)
-    setIsLoaded(true)
-  }, [])
+  }, [brands])
 
   const handleViewAllBrands = () => {
     router.push("/brands")
   }
 
   // Prevents layout shift/flash before the shuffle happens
-  if (!isLoaded || topBrands.length === 0) {
+  if (loading || topBrands.length === 0) {
     return null
   }
 

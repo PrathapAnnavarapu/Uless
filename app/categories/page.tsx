@@ -4,22 +4,30 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
-import { mockCategories, mockBrands } from "@/data/mock-data"
+import { useCategoryContext } from "@/contexts/category-context"
+import { useBrandsContext } from "@/contexts/brand-context"
 import { PageSEO } from "@/components/seo/page-seo"
 import { SchemaMarkup } from "@/components/seo/schema-markup"
 
 export default function CategoriesPage() {
   const router = useRouter()
 
+  const { categories, loading: categoriesLoading } = useCategoryContext()
+  const { brands, loading: brandsLoading } = useBrandsContext()
+
   // Count brands per category
-  const brandCountByCategory = mockCategories.reduce(
+  const brandCountByCategory = categories.reduce(
     (acc, category) => {
-      const count = mockBrands.filter((brand) => brand.category === category.name).length
+      const count = brands.filter((brand) => brand.category === category.name).length
       acc[category.name] = count
       return acc
     },
     {} as Record<string, number>,
   )
+
+  if (categoriesLoading || brandsLoading) {
+    return <div className="container mx-auto p-8">Loading categories...</div>
+  }
 
   return (
     <main className="flex flex-col w-full min-h-screen bg-[#f8faff]">
@@ -55,7 +63,7 @@ export default function CategoriesPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {mockCategories.map((category) => (
+            {categories.map((category) => (
               <Link
                 key={category.id}
                 href={`/categories/${category.slug}`}
